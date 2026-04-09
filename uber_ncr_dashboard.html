@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NCR Rides — Analytics Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --bg2: #111418;
+    --bg3: #181c22;
+    --border: rgba(255,255,255,0.07);
+    --accent: #f5a623;
+    --accent2: #00e5b4;
+    --accent3: #e85d75;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --card-bg: #13161c;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(245,166,35,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(245,166,35,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { max-width: 1400px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  /* Header */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 28px 0;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo-area { display: flex; align-items: center; gap: 16px; }
+
+  .logo-icon {
+    width: 44px; height: 44px;
+    background: var(--accent);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+
+  h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+  h1 span { color: var(--accent); }
+
+  .subtitle { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .badge span { color: var(--accent2); }
+
+  /* KPI Grid */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .kpi {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s;
+    cursor: default;
+  }
+  .kpi:hover { border-color: rgba(245,166,35,0.3); transform: translateY(-2px); }
+
+  .kpi::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .kpi.gold::before  { background: var(--accent); }
+  .kpi.teal::before  { background: var(--accent2); }
+  .kpi.red::before   { background: var(--accent3); }
+  .kpi.blue::before  { background: #4d9fff; }
+  .kpi.purple::before { background: #a78bfa; }
+
+  .kpi-label { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+  .kpi-value { font-size: 28px; font-weight: 800; letter-spacing: -1px; }
+  .kpi-value.gold   { color: var(--accent); }
+  .kpi-value.teal   { color: var(--accent2); }
+  .kpi-value.red    { color: var(--accent3); }
+  .kpi-value.blue   { color: #4d9fff; }
+  .kpi-value.purple { color: #a78bfa; }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 6px; font-family: 'DM Mono', monospace; }
+
+  /* Charts Grid */
+  .charts-row { display: grid; gap: 20px; margin-bottom: 20px; animation: fadeUp 0.7s ease both; }
+  .row-2 { grid-template-columns: 1fr 1fr; }
+  .row-3 { grid-template-columns: 1.5fr 1fr; }
+  .row-4 { grid-template-columns: 1fr 1fr 1fr; }
+
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: rgba(255,255,255,0.12); }
+
+  .card-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    font-family: 'DM Mono', monospace;
+  }
+  .card-desc { font-size: 12px; color: rgba(107,114,128,0.7); margin-bottom: 20px; }
+
+  canvas { max-height: 260px; }
+
+  /* Heatmap */
+  .heatmap-wrap { overflow-x: auto; }
+  .heatmap-table { width: 100%; border-collapse: collapse; font-family: 'DM Mono', monospace; font-size: 10px; }
+  .heatmap-table th { color: var(--muted); padding: 4px 6px; text-align: center; font-weight: 400; }
+  .heatmap-table td {
+    width: 36px; height: 28px;
+    text-align: center;
+    border-radius: 4px;
+    font-size: 9px;
+    color: rgba(255,255,255,0.7);
+    cursor: default;
+    transition: transform 0.15s;
+  }
+  .heatmap-table td:hover { transform: scale(1.15); z-index: 10; position: relative; }
+  .heatmap-table .day-label { color: var(--muted); text-align: right; padding-right: 8px; font-size: 10px; white-space: nowrap; }
+
+  /* ML Model Section */
+  .model-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; animation: fadeUp 0.8s ease both; }
+
+  .metric-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    margin: 4px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+  }
+  .metric-pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .metric-pill .val { font-size: 18px; font-weight: 700; }
+
+  /* Insights */
+  .insights-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; animation: fadeUp 0.9s ease both; }
+
+  .insight {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    border-left: 3px solid var(--accent);
+  }
+  .insight.teal  { border-left-color: var(--accent2); }
+  .insight.red   { border-left-color: var(--accent3); }
+  .insight.blue  { border-left-color: #4d9fff; }
+
+  .insight-icon { font-size: 24px; margin-bottom: 10px; }
+  .insight-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 6px; font-family: 'DM Mono', monospace; }
+  .insight-text { font-size: 13px; line-height: 1.5; color: var(--text); }
+  .insight-text strong { color: var(--accent); }
+  .insight.teal .insight-text strong { color: var(--accent2); }
+  .insight.red  .insight-text strong { color: var(--accent3); }
+  .insight.blue .insight-text strong { color: #4d9fff; }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 20px 0;
+    text-align: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo-area">
+      <div class="logo-icon">🚖</div>
+      <div>
+        <h1>NCR Rides <span>Analytics</span></h1>
+        <div class="subtitle">150,000 bookings · Jan – Dec 2024 · Delhi NCR Region</div>
+      </div>
+    </div>
+    <div class="badge">Dataset: <span>ncr_ride_bookings.csv</span></div>
+  </header>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi gold">
+      <div class="kpi-label">Total Bookings</div>
+      <div class="kpi-value gold">150K</div>
+      <div class="kpi-sub">Full year · 2024</div>
+    </div>
+    <div class="kpi teal">
+      <div class="kpi-label">Completion Rate</div>
+      <div class="kpi-value teal">62%</div>
+      <div class="kpi-sub">93,000 completed rides</div>
+    </div>
+    <div class="kpi red">
+      <div class="kpi-label">Problem Rate</div>
+      <div class="kpi-value red">32%</div>
+      <div class="kpi-sub">Cancel / No Driver / Incomplete</div>
+    </div>
+    <div class="kpi blue">
+      <div class="kpi-label">Annual Revenue</div>
+      <div class="kpi-value blue">₹51.8M</div>
+      <div class="kpi-sub">Avg ₹508 per completed ride</div>
+    </div>
+    <div class="kpi purple">
+      <div class="kpi-label">Avg Wait (VTAT)</div>
+      <div class="kpi-value purple">8.5 min</div>
+      <div class="kpi-sub">Top predictor of cancellations</div>
+    </div>
+  </div>
+
+  <!-- Row 1: Booking Status + Hourly Demand -->
+  <div class="charts-row row-2">
+    <div class="card">
+      <div class="card-title">Booking Status</div>
+      <div class="card-desc">Distribution of all 150,000 ride outcomes</div>
+      <canvas id="statusChart"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Hourly Demand Pattern</div>
+      <div class="card-desc">Aggregated rides per hour — all 365 days</div>
+      <canvas id="hourlyChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Row 2: Heatmap -->
+  <div class="charts-row" style="grid-template-columns: 1fr; margin-bottom: 20px;">
+    <div class="card">
+      <div class="card-title">Demand Heatmap — Day × Hour</div>
+      <div class="card-desc">Darker = higher ride volume. Evening peaks and mid-morning peaks visible across all weekdays.</div>
+      <div class="heatmap-wrap" id="heatmapContainer"></div>
+    </div>
+  </div>
+
+  <!-- Row 3: Vehicle + Revenue -->
+  <div class="charts-row row-2">
+    <div class="card">
+      <div class="card-title">Monthly Revenue Trend</div>
+      <div class="card-desc">₹ revenue per month — consistent with low seasonality</div>
+      <canvas id="revenueChart"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Vehicle Type — Bookings</div>
+      <div class="card-desc">Auto leads by volume; all types earn ~₹505–512 avg fare</div>
+      <canvas id="vehicleChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Row 4: Cancellation Reasons -->
+  <div class="charts-row row-2">
+    <div class="card">
+      <div class="card-title">Customer Cancellation Reasons</div>
+      <div class="card-desc">10,500 customer-cancelled rides</div>
+      <canvas id="custCancelChart"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Driver Cancellation Reasons</div>
+      <div class="card-desc">27,000 driver-cancelled rides — 2.6× more than customers</div>
+      <canvas id="drivCancelChart"></canvas>
+    </div>
+  </div>
+
+  <!-- ML Models -->
+  <div class="model-row">
+    <div class="card">
+      <div class="card-title">🤖 Demand Forecasting</div>
+      <div class="card-desc">Gradient Boosting Regressor — predicts hourly ride demand from time features</div>
+      <div style="margin-bottom: 16px;">
+        <div class="metric-pill"><div class="dot" style="background:var(--accent2)"></div><span>R² Score</span><span class="val" style="color:var(--accent2)">0.83</span></div>
+        <div class="metric-pill"><div class="dot" style="background:var(--accent)"></div><span>MAE</span><span class="val" style="color:var(--accent)">3.15 rides/hr</span></div>
+        <div class="metric-pill"><div class="dot" style="background:#a78bfa"></div><span>Features</span><span class="val" style="color:#a78bfa">7</span></div>
+      </div>
+      <canvas id="demandFiChart"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">🎯 Cancellation Prediction</div>
+      <div class="card-desc">Random Forest Classifier — predicts ride failure risk at booking time</div>
+      <div style="margin-bottom: 16px;">
+        <div class="metric-pill"><div class="dot" style="background:var(--accent2)"></div><span>ROC-AUC</span><span class="val" style="color:var(--accent2)">0.64</span></div>
+        <div class="metric-pill"><div class="dot" style="background:var(--accent)"></div><span>Accuracy</span><span class="val" style="color:var(--accent)">67%</span></div>
+        <div class="metric-pill"><div class="dot" style="background:#a78bfa"></div><span>Trees</span><span class="val" style="color:#a78bfa">150</span></div>
+      </div>
+      <canvas id="cancelFiChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Insights -->
+  <div class="insights-grid">
+    <div class="insight">
+      <div class="insight-icon">⚡</div>
+      <div class="insight-title">Peak Supply Gap</div>
+      <div class="insight-text">Evening peak (18:00–20:00) has <strong>highest demand</strong> but also the highest cancellation window. Deploy driver bonuses during this slot.</div>
+    </div>
+    <div class="insight teal">
+      <div class="insight-icon">📍</div>
+      <div class="insight-title">VTAT Is Key</div>
+      <div class="insight-text">Wait time is the <strong>#1 feature</strong> predicting ride problems. Cutting avg VTAT below 5 min could significantly reduce the 32% problem rate.</div>
+    </div>
+    <div class="insight red">
+      <div class="insight-icon">🚨</div>
+      <div class="insight-title">Driver Reliability</div>
+      <div class="insight-text">Drivers cancel <strong>2.6× more</strong> than customers. "Customer related issue" tops driver reasons — deploy a pre-trip in-app alert.</div>
+    </div>
+    <div class="insight blue">
+      <div class="insight-icon">💡</div>
+      <div class="insight-title">Demand is Predictable</div>
+      <div class="insight-text">GBR model explains <strong>83% of demand variance</strong>. Pre-positioning drivers using hourly forecasts can cut No Driver Found incidents.</div>
+    </div>
+  </div>
+
+  <footer>
+    NCR Uber Rides Analytics · 150,000 records · Built with Python, scikit-learn & Chart.js
+  </footer>
+</div>
+
+<script>
+Chart.defaults.color = '#6b7280';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
+Chart.defaults.font.family = "'DM Mono', monospace";
+Chart.defaults.font.size = 11;
+
+const GOLD   = '#f5a623';
+const TEAL   = '#00e5b4';
+const RED    = '#e85d75';
+const BLUE   = '#4d9fff';
+const PURPLE = '#a78bfa';
+
+// 1. Booking Status Doughnut
+new Chart(document.getElementById('statusChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Completed','Cancelled by Driver','No Driver Found','Cancelled by Customer','Incomplete'],
+    datasets: [{
+      data: [93000, 27000, 10500, 10500, 9000],
+      backgroundColor: [TEAL, RED, GOLD, '#f97316', PURPLE],
+      borderWidth: 2,
+      borderColor: '#13161c',
+      hoverOffset: 8
+    }]
+  },
+  options: {
+    plugins: {
+      legend: { position: 'right', labels: { boxWidth: 10, padding: 14, font: { size: 11 } } },
+      tooltip: { callbacks: { label: (c) => ` ${c.label}: ${c.raw.toLocaleString()} (${(c.raw/150000*100).toFixed(1)}%)` } }
+    },
+    cutout: '60%'
+  }
+});
+
+// 2. Hourly Demand
+const hours = Array.from({length:24}, (_,i) => i);
+const hourlyData = [1373,1360,1339,1383,1321,2786,4160,5450,6861,8234,9577,8390,7006,5470,7031,8202,9633,11044,12397,11047,9630,8103,5441,2762];
+new Chart(document.getElementById('hourlyChart'), {
+  type: 'bar',
+  data: {
+    labels: hours.map(h => `${h}:00`),
+    datasets: [{
+      label: 'Rides',
+      data: hourlyData,
+      backgroundColor: hourlyData.map((_,i) => (i>=17&&i<=20) ? RED : (i>=7&&i<=10) ? GOLD : 'rgba(77,159,255,0.5)'),
+      borderRadius: 3,
+      borderSkipped: false
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.raw.toLocaleString()} rides` } } },
+    scales: { y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: v => v >= 1000 ? `${v/1000}k` : v } }, x: { grid: { display: false } } }
+  }
+});
+
+// 3. Heatmap
+const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const heatmapRaw = {
+  "Mon":[204,209,206,203,183,446,594,770,1026,1204,1335,1207,1000,744,1006,1166,1394,1578,1835,1564,1418,1215,728,409],
+  "Tue":[179,186,206,206,185,418,626,795,1026,1141,1391,1140,994,753,1003,1198,1329,1539,1763,1596,1372,1166,798,381],
+  "Wed":[208,188,195,180,185,369,621,775,942,1214,1326,1161,1029,793,963,1170,1394,1606,1789,1565,1412,1109,791,428],
+  "Thu":[207,197,186,197,170,396,575,774,937,1148,1338,1236,1001,786,987,1227,1357,1583,1687,1547,1364,1142,783,390],
+  "Fri":[180,187,190,203,204,379,585,766,984,1168,1374,1266,1021,795,1043,1156,1409,1542,1767,1576,1371,1107,762,362],
+  "Sat":[195,201,174,190,201,412,593,776,965,1158,1408,1186,993,805,1036,1168,1356,1604,1800,1559,1380,1171,789,422],
+  "Sun":[200,192,182,204,193,366,566,794,981,1201,1405,1194,968,794,993,1117,1394,1592,1756,1640,1313,1193,790,370]
+};
+
+function heatColor(val) {
+  const min = 170, max = 1900;
+  const t = Math.min(1, Math.max(0, (val - min) / (max - min)));
+  const r = Math.round(20 + t * (232 - 20));
+  const g = Math.round(20 + t * (50 - 20));
+  const b = Math.round(20 + t * (20 - 20));
+  return `rgba(${r},${g},${b},${0.3 + t * 0.7})`;
+}
+
+const heatContainer = document.getElementById('heatmapContainer');
+let tableHTML = '<table class="heatmap-table"><thead><tr><th></th>';
+for (let h = 0; h < 24; h++) tableHTML += `<th>${h}</th>`;
+tableHTML += '</tr></thead><tbody>';
+days.forEach(day => {
+  tableHTML += `<tr><td class="day-label">${day}</td>`;
+  heatmapRaw[day].forEach(v => {
+    tableHTML += `<td style="background:${heatColor(v)}" title="${v} rides">${v >= 1000 ? (v/1000).toFixed(1)+'k' : v}</td>`;
+  });
+  tableHTML += '</tr>';
+});
+tableHTML += '</tbody></table>';
+heatContainer.innerHTML = tableHTML;
+
+// 4. Monthly Revenue
+new Chart(document.getElementById('revenueChart'), {
+  type: 'line',
+  data: {
+    labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+    datasets: [{
+      label: 'Revenue (₹)',
+      data: [4411069,4085790,4568188,4253789,4320679,4325660,4365923,4243509,4191393,4417170,4343395,4319618],
+      borderColor: GOLD,
+      backgroundColor: 'rgba(245,166,35,0.08)',
+      borderWidth: 2.5,
+      pointBackgroundColor: GOLD,
+      pointRadius: 5,
+      fill: true,
+      tension: 0.3
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ₹${(c.raw/1e6).toFixed(2)}M` } } },
+    scales: { y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: v => `₹${(v/1e6).toFixed(1)}M` } }, x: { grid: { display: false } } }
+  }
+});
+
+// 5. Vehicle bookings
+new Chart(document.getElementById('vehicleChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Auto','Go Mini','Go Sedan','Bike','Premier Sedan','eBike','Uber XL'],
+    datasets: [{
+      label: 'Bookings',
+      data: [37419, 29806, 27141, 22517, 18111, 10557, 4449],
+      backgroundColor: [GOLD, TEAL, BLUE, PURPLE, RED, '#f97316', '#64748b'],
+      borderRadius: 5,
+      borderSkipped: false
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.raw.toLocaleString()} rides` } } },
+    scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: v => `${(v/1000).toFixed(0)}k` } }, y: { grid: { display: false } } }
+  }
+});
+
+// 6. Customer cancellations
+new Chart(document.getElementById('custCancelChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Wrong Address','Change of plans','Driver not moving','Driver asked to cancel','AC not working'],
+    datasets: [{ label: 'Count', data: [2362,2353,2335,2295,1155], backgroundColor: RED, borderRadius: 4, borderSkipped: false }]
+  },
+  options: {
+    indexAxis: 'y',
+    plugins: { legend: { display: false } },
+    scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' } }, y: { grid: { display: false }, ticks: { font: { size: 10 } } } }
+  }
+});
+
+// 7. Driver cancellations
+new Chart(document.getElementById('drivCancelChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Customer related issue','Customer coughing/sick','Personal & Car issues','Too many passengers'],
+    datasets: [{ label: 'Count', data: [6837,6751,6726,6686], backgroundColor: '#f97316', borderRadius: 4, borderSkipped: false }]
+  },
+  options: {
+    indexAxis: 'y',
+    plugins: { legend: { display: false } },
+    scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' } }, y: { grid: { display: false }, ticks: { font: { size: 10 } } } }
+  }
+});
+
+// 8. Demand FI
+new Chart(document.getElementById('demandFiChart'), {
+  type: 'bar',
+  data: {
+    labels: ['IsPeakEvening','IsPeakMorning','IsWeekend','Weekday','Month','Day','Hour'],
+    datasets: [{ data: [0.28, 0.22, 0.04, 0.10, 0.10, 0.12, 0.14], backgroundColor: TEAL, borderRadius: 4, borderSkipped: false }]
+  },
+  options: {
+    indexAxis: 'y',
+    plugins: { legend: { display: false } },
+    scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: v => `${(v*100).toFixed(0)}%` } }, y: { grid: { display: false } } }
+  }
+});
+
+// 9. Cancellation FI
+new Chart(document.getElementById('cancelFiChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Weekday','Vehicle','Month','DayOfMonth','Hour','Pickup Loc.','Avg VTAT'],
+    datasets: [{ data: [0.058, 0.073, 0.081, 0.115, 0.129, 0.218, 0.327], backgroundColor: PURPLE, borderRadius: 4, borderSkipped: false }]
+  },
+  options: {
+    indexAxis: 'y',
+    plugins: { legend: { display: false } },
+    scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: v => `${(v*100).toFixed(0)}%` } }, y: { grid: { display: false } } }
+  }
+});
+</script>
+</body>
+</html>
